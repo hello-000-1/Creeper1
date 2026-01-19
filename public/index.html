@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CREEPER🤖 - Panel de Control</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+
+        .status-disconnected {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .status-connecting {
+            background: #ffd93d;
+            color: #333;
+        }
+
+        .status-connected {
+            background: #51cf66;
+            color: white;
+        }
+
+        .qr-section, .code-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        #qr-canvas {
+            max-width: 300px;
+            margin: 20px auto;
+            display: none;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            padding: 10px;
+            background: white;
+        }
+
+        .code-display {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 5px;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .input-group {
+            margin: 20px 0;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 0;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ee5a52;
+        }
+
+        .btn-secondary {
+            background: #868e96;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #6c757d;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: #f1f3f5;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .user-info h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .user-info p {
+            color: #495057;
+            margin: 5px 0;
+        }
+
+        .logs {
+            background: #212529;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 20px 0;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .connecting {
+            animation: pulse 1.5s infinite;
+        }
+
+        .instructions {
+            background: #e7f5ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #339af0;
+        }
+
+        .instructions h4 {
+            color: #1971c2;
+            margin-bottom: 10px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            color: #495057;
+        }
+
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 CREEPER BOT</h1>
+            <p>Panel de Control - Black Clover MD</p>
+            <div class="status-badge status-disconnected" id="status-badge">
+                ⚫ Desconectado
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('qr')">📱 Código QR</button>
+            <button class="tab" onclick="switchTab('code')">🔢 Código de Texto</button>
+        </div>
+
+        <div id="qr-tab" class="tab-content active">
+            <div class="instructions">
+                <h4>📱 Instrucciones para QR:</h4>
+                <ol>
+                    <li>Abre WhatsApp en tu teléfono</li>
+                    <li>Ve a Dispositivos Vinculados</li>
+                    <li>Toca en "Vincular un dispositivo"</li>
+                    <li>Escanea el código QR que aparece abajo</li>
+                </ol>
+            </div>
+            
+            <div class="qr-section">
+                <canvas id="qr-canvas"></canvas>
+                <p id="qr-waiting" style="color: #868e96;">Esperando código QR...</p>
+            </div>
+        </div>
+
+        <div id="code-tab" class="tab-content">
+            <div class="instructions">
+                <h4>🔢 Instrucciones para Código:</h4>
+                <ol>
+                    <li>Ingresa tu número de WhatsApp con código de país</li>
+                    <li>Ejemplo: +51939467706</li>
+                    <li>Presiona "Solicitar Código"</li>
+                    <li>Ingresa el código en WhatsApp → Dispositivos Vinculados</li>
+                </ol>
+            </div>
+
+            <div class="input-group">
+                <label for="phone-input">📞 Número de WhatsApp:</label>
+                <input 
+                    type="tel" 
+                    id="phone-input" 
+                    placeholder="+51939467706"
+                    pattern="\+?[0-9]+"
+                >
+            </div>
+
+            <button class="btn btn-primary" onclick="requestPairingCode()" id="request-code-btn">
+                Solicitar Código de Vinculación
+            </button>
+
+            <div class="code-display" id="code-display"></div>
+        </div>
+
+        <div class="user-info" id="user-info">
+            <h3>👤 Información del Bot</h3>
+            <p><strong>Nombre:</strong> <span id="user-name">-</span></p>
+            <p><strong>Número:</strong> <span id="user-number">-</span></p>
+            <p><strong>ID:</strong> <span id="user-id">-</span></p>
+        </div>
+
+        <div class="logs" id="logs">
+            <div class="log-entry">[SISTEMA] Esperando conexión...</div>
+        </div>
+
+        <button class="btn btn-danger" onclick="disconnect()" id="disconnect-btn" style="display: none;">
+            🔴 Desconectar Bot
+        </button>
+
+        <button class="btn btn-secondary" onclick="restart()" id="restart-btn">
+            🔄 Reiniciar Conexión
+        </button>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentTab = 'qr';
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'qr') {
+                document.querySelector('.tabs .tab:first-child').classList.add('active');
+                document.getElementById('qr-tab').classList.add('active');
+            } else {
+                document.querySelector('.tabs .tab:last-child').classList.add('active');
+                document.getElementById('code-tab').classList.add('active');
+            }
+        }
+
+        function addLog(message) {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        socket.on('qr-code', (qr) => {
+            addLog('📱 Código QR generado');
+            const canvas = document.getElementById('qr-canvas');
+            const waiting = document.getElementById('qr-waiting');
+            
+            QRCode.toCanvas(canvas, qr, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: '#667eea',
+                    light: '#ffffff'
+                }
+            });
+            
+            canvas.style.display = 'block';
+            waiting.style.display = 'none';
+        });
+
+        socket.on('pairing-code', (code) => {
+            addLog(`🔢 Código de vinculación: ${code}`);
+            const display = document.getElementById('code-display');
+            display.textContent = code;
+            display.style.display = 'block';
+        });
+
+        socket.on('status-update', (data) => {
+            const badge = document.getElementById('status-badge');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            const userInfo = document.getElementById('user-info');
+            
+            badge.className = 'status-badge status-' + data.status;
+            
+            switch(data.status) {
+                case 'disconnected':
+                    badge.textContent = '⚫ Desconectado';
+                    badge.classList.remove('connecting');
+                    disconnectBtn.style.display = 'none';
+                    userInfo.style.display = 'none';
+                    addLog('🔴 Bot desconectado');
+                    break;
+                case 'connecting':
+                    badge.textContent = '🟡 Conectando...';
+                    badge.classList.add('connecting');
+                    disconnectBtn.style.display = 'none';
+                    addLog('🟡 Conectando al servidor...');
+                    break;
+                case 'connected':
+                    badge.textContent = '🟢 Conectado';
+                    badge.classList.remove('connecting');
+                    disconnectBtn.style.display = 'block';
+                    
+                    if (data.user) {
+                        document.getElementById('user-name').textContent = data.user.name || 'Bot';
+                        document.getElementById('user-number').textContent = data.user.id.split(':')[0] || '-';
+                        document.getElementById('user-id').textContent = data.user.id || '-';
+                        userInfo.style.display = 'block';
+                    }
+                    
+                    // Ocultar QR y código
+                    document.getElementById('qr-canvas').style.display = 'none';
+                    document.getElementById('qr-waiting').style.display = 'none';
+                    document.getElementById('code-display').style.display = 'none';
+                    
+                    addLog('🟢 ¡Bot conectado exitosamente!');
+                    break;
+            }
+        });
+
+        socket.on('new-message', (msg) => {
+            addLog(`💬 Mensaje de ${msg.from}`);
+        });
+
+        async function requestPairingCode() {
+            const phoneInput = document.getElementById('phone-input');
+            const phone = phoneInput.value.trim();
+            
+            if (!phone) {
+                alert('Por favor ingresa un número de teléfono');
+                return;
+            }
+
+            const btn = document.getElementById('request-code-btn');
+            btn.disabled = true;
+            btn.textContent = 'Generando código...';
+
+            try {
+                const response = await fetch('/api/request-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber: phone })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    addLog(`✅ ${data.message}`);
+                } else {
+                    alert(data.error || 'Error al generar código');
+                    addLog(`❌ ${data.error}`);
+                }
+            } catch (error) {
+                alert('Error de conexión');
+                addLog(`❌ Error: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Solicitar Código de Vinculación';
+            }
+        }
+
+        async function disconnect() {
+            if (!confirm('¿Estás seguro de desconectar el bot?')) return;
+            
+            try {
+                await fetch('/api/disconnect', { method: 'POST' });
+                addLog('🔴 Desconectando bot...');
+            } catch (error) {
+                addLog(`❌ Error al desconectar: ${error.message}`);
+            }
+        }
+
+        async function restart() {
+            if (!confirm('¿Reiniciar la conexión del bot?')) return;
+            
+            try {
+                await fetch('/api/restart', { method: 'POST' });
+                addLog('🔄 Reiniciando conexión...');
+            } catch (error) {
+                addLog(`❌ Error al reiniciar: ${error.message}`);
+            }
+        }
+
+        // Permitir enviar código con Enter
+        document.getElementById('phone-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') requestPairingCode();
+        });
+
+        addLog('✅ Panel cargado correctamente');
+    </script>
+</body>
+</html>

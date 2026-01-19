@@ -16,6 +16,7 @@
   },
   "scripts": {
     "start": "node index.js",
+    "web": "node server.js",
     "qr": "node index.js qr",
     "code": "node index.js code",
     "eslint": "eslint .",
